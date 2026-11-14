@@ -34,6 +34,7 @@
 | 日付 | 内容 |
 | --- | --- |
 | 2026-10-23 | `session.upload_progress.enabled=0` を設定、WordPressイメージのバージョンを固定、deploy.sh を作成 |
+| 2026-11-03 | Web（80/443）への接続を Cloudflare 経由に限定 |
 | 2026-11-14 | `expose_php = Off` を設定、deploy.sh に再起動処理を追加 |
 | 2026-11-14 | OSアップデート（24.04.4 → 24.04.5、カーネル 6.8.0-149） |
 | 2026-11-14 | saunas-php / saunas-mariadb の自動起動を無効化 |
