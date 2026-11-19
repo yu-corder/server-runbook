@@ -40,3 +40,4 @@
 | 2026-11-14 | saunas-php / saunas-mariadb の自動起動を無効化 |
 | 2026-11-14 | 資料を作成 |
 | 2026-11-19 | Nginx を 1.28.3 → 1.30.7 に更新（ベースイメージ alpine:3.22 → 3.24） |
+| 2026-11-19 | WordPress への転送先を IP から host.docker.internal に変更、sauna-rally リポジトリの履歴から IP を削除 |

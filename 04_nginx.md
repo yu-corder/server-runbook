@@ -18,7 +18,7 @@
 
 | ドメイン | 処理 |
 | --- | --- |
-| yu-syumilog.com | wp-app-prod へ転送 |
+| yu-syumilog.com | wp-app-prod へ転送（`http://host.docker.internal:8080`） |
 | sauna-rally.com | サービス終了ページを返す |
 
 ## 注意点
@@ -30,6 +30,19 @@ sauna-rally の php コンテナは停止しているため、Nginx の設定に
 docker exec saunas-nginx nginx -t
 docker exec saunas-nginx nginx -s reload
 ```
+
+## WordPress への転送
+
+saunas-nginx と wp-app-prod は別の Docker ネットワークにいるため、ホストの 8080 番を経由して転送する。
+転送先にはホストの IP を書かず、`host.docker.internal` を使う。
+
+```yaml
+# docker-compose.prod.yml（nginx）
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
+
+`host-gateway` はコンテナから見たホストのアドレスに置き換わる。通信はサーバーの中で完結し、パケットフィルタは通らない。
 
 ## HTTP/2 を無効にしている理由
 

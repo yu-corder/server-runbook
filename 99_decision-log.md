@@ -54,3 +54,13 @@
 
 - **決定**: saunas-nginx では HTTP/2 を無効のままにする
 - **理由**: Cloudflare との通信は HTTP/1.1 で足りるうえ、HTTP/2 の実装に脆弱性が見つかったときに影響を受けにくくなるため
+
+## WordPress への転送先に IP を書かない（2026-11-19）
+
+- **決定**: saunas-nginx の `proxy_pass` を、ホストのグローバル IP から `host.docker.internal`（`extra_hosts` の `host-gateway`）に変える
+- **理由**: sauna-rally の公開リポジトリの設定ファイルに IP を書いていたため。Cloudflare で隠しているオリジンの IP が読めてしまい、この資料の公開基準とも食い違っていた
+- **あわせて行ったこと**:
+  - 使っていなかったローカル HTTPS テスト用の設定（`*.conf.local`、`docker-compose.local-test.yml`）を削除した
+  - git-filter-repo で、リポジトリの全履歴の IP を `REDACTED_IP` に置き換えて force push した（コミットのハッシュはすべて変わった）
+  - サーバーの clone は `git fetch` と `git reset --hard origin/main` で新しい履歴に合わせた
+- **残るもの**: 書き換え前に clone や fork されたものと、GitHub に残る古いコミットのキャッシュは消せない。80/443 番は Cloudflare 以外から接続できないため、実害は小さいと判断した
