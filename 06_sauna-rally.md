@@ -24,4 +24,5 @@ docker stop saunas-php saunas-mariadb
 ## 注意点
 
 - `docker update` で変えた設定はそのコンテナにだけ効く。sauna-rally のディレクトリで `docker compose up -d` を実行すると、compose ファイルの設定でコンテナが作り直され、自動起動が元に戻る
+- sauna-rally の deploy.sh も `up -d --build` で全サービスを作り直すため、実行後は上の「停止の方法」をもう一度行う
 - php コンテナを止めた状態でも Nginx が起動できることを、`docker exec saunas-nginx nginx -t` で確認済み
