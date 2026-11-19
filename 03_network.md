@@ -7,6 +7,7 @@
 - ポートの開け閉めは、さくらのVPSのパケットフィルタで行う（22 / 80 / 443 のみ許可）
 - 80/443 番は、Cloudflare 以外からの接続を iptables（DOCKER-USER チェーン）で遮断する
   - `cloudflare-iptables.service` が起動時に `/usr/local/sbin/cloudflare-iptables.sh` を実行する
+- IPv6 は無効（グローバルアドレスなし）。パケットフィルタは IPv6 を全て通し、cloudflare-iptables.sh も IPv4 のみのため、IPv6 を有効にする場合は先に ip6tables の制限を入れること
 
 ## 待ち受けポート
 
