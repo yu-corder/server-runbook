@@ -4,8 +4,9 @@
 
 ## 方針
 
-- Web への通信は Cloudflare を経由させ、オリジンサーバーの 80/443 番は Cloudflare 以外から接続できないようにする
-- アクセス制限は OS のファイアウォールではなく、さくらのVPSのパケットフィルタで行う
+- ポートの開け閉めは、さくらのVPSのパケットフィルタで行う（22 / 80 / 443 のみ許可）
+- 80/443 番は、Cloudflare 以外からの接続を iptables（DOCKER-USER チェーン）で遮断する
+  - `cloudflare-iptables.service` が起動時に `/usr/local/sbin/cloudflare-iptables.sh` を実行する
 
 ## 待ち受けポート
 
