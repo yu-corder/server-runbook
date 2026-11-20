@@ -64,3 +64,25 @@
   - git-filter-repo で、リポジトリの全履歴の IP を `REDACTED_IP` に置き換えて force push した（コミットのハッシュはすべて変わった）
   - サーバーの clone は `git fetch` と `git reset --hard origin/main` で新しい履歴に合わせた
 - **残るもの**: 書き換え前に clone や fork されたものと、GitHub に残る古いコミットのキャッシュは消せない。80/443 番は Cloudflare 以外から接続できないため、実害は小さいと判断した
+
+## PHP の 2026-11-19 のセキュリティリリースへの対応（2026-11-20）
+
+- **決定**: 緊急対応はせず、公式イメージが更新されてから PHP を 8.3.36 → 8.3.37 に上げる
+- **理由**: Critical とされた2件が、どちらもこの構成では条件に当てはまらなかったため
+  - CVE-2026-115560（セッションのシリアライザ不一致による RCE）: `session.serialize_handler` は既定の `php` のままで、実行時に切り替えるコードもない。`session.upload_progress.enabled=0` も 2026-10-23 から設定済み
+  - CVE-2026-129289（PHP-FPM のリクエストスマグリング）: Apache 版のイメージ（mod_php）で、FPM を使っていない
+- **結果**: 同じ日のうちに公式イメージが更新され、WordPress 7.1.5 のイメージで 8.3.37 になった
+
+## WordPress 本体の更新をイメージのタグで管理する（2026-11-20）
+
+- **決定**: `WP_AUTO_UPDATE_CORE` を `false` にして本体の自動更新を止め、本体はイメージのタグを上げて更新する。deploy.sh では `--renew-anon-volumes` で `/var/www/html` の匿名ボリュームを作り直す
+- **理由**: 本体は匿名ボリュームに入っていて、タグを上げてもボリュームが引き継がれると古い本体のまま残る。また、管理画面の自動更新が動くと、タグとコンテナの中身のバージョンがずれ、次のデプロイで元に戻ってしまう。バージョンを決める場所をタグ（＝ Git）の1か所にそろえるため
+- **影響**: WordPress のセキュリティリリースは自動では当たらない。リリースを見て自分でタグを上げる必要がある
+- **検討した案**: `/var/www/html` 全体をバインドマウントして自動更新に任せる案もあったが、本体のバージョンを Git で追えなくなるため採らなかった
+
+## 本番のコンテナがローカル用に作り直された障害（2026-11-20）
+
+- **何が起きたか**: PHP の更新作業中に、ファイルを指定せずに `docker compose up -d wordpress` を実行した。`docker-compose.yml`（ローカル用）の構成で wp-app-prod / wp-mariadb-prod が `wp-app-local` / `wp-mariadb-local` に作り直され、saunas-nginx から WordPress に繋がらなくなり、サイトが数分停止した
+- **復旧**: ローカル用のコンテナを停止・削除し、`docker compose -f docker-compose.prod.yml up -d` で本番用を起動した。データ（`wp-content`、`wp-db-data`）はバインドマウントのため影響なし
+- **再発防止**: 本番では必ず `-f docker-compose.prod.yml` を付ける（→ [07](07_deploy.md#compose-ファイルを必ず指定する)）
+- **わかったこと**: deploy.sh は `--no-deps` で WordPress だけを作り直すため、DB コンテナが消えている状態からは復旧できない
