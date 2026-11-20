@@ -89,10 +89,32 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps 
 
 ## 証明書の更新
 
-cron で毎日 3:00 に更新スクリプトを実行している。
+Let's Encrypt の証明書（yu-syumilog.com / sauna-rally.com）を、root の cron で毎日 3:00 に更新スクリプトを実行して更新している。
 
 ```
+# sudo crontab -l
 0 3 * * * /var/www/sauna-rally/renew-cert.sh >> /var/www/sauna-rally/renew.log 2>&1
 ```
 
-結果は `/var/www/sauna-rally/renew.log` で確認する。
+### renew-cert.sh の処理
+
+| 順番 | 処理 | 内容 |
+| --- | --- | --- |
+| 1 | `docker run --rm certbot/dns-cloudflare:v5.4.0 renew --no-random-sleep-on-renew` | 期限が近い証明書だけを更新する。Cloudflare の DNS で認証する |
+| 2 | `docker exec saunas-nginx nginx -s reload` | Nginx に新しい証明書を読み込ませる |
+
+- 証明書と certbot の設定はホストの `/etc/letsencrypt` にあり、コンテナにマウントして使う
+- certbot は期限の30日前になるまで更新しない。それ以外の日は「not yet due for renewal」と出て何もしない
+- 手順2の reload は毎日実行されるが、接続を切らずに設定を読み直すだけなのでサイトは止まらない
+
+### 確認
+
+```bash
+tail -20 /var/www/sauna-rally/renew.log   # 各証明書の期限と、更新したかどうか
+```
+
+### certbot のイメージを消さない
+
+`certbot/dns-cloudflare:v5.4.0` は更新のときだけ `docker run --rm` で起動するため、普段はコンテナがなく、`docker image ls` で使用中（`U`）の印が付かない。イメージを整理するときに消さないこと。消しても次の実行で再取得されるが、そのときに Docker Hub に繋がらないと更新に失敗する。
+
+`certbot/certbot:latest` は使っていない（2026-11-20 に削除）。
