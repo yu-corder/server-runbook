@@ -7,9 +7,9 @@
 | コンテナ名 | イメージ | 公開ポート | restart |
 | --- | --- | --- | --- |
 | wp-app-prod | wordpress:7.1.5-php8.3-apache | 0.0.0.0:8080→80 | always |
-| wp-mariadb-prod | mariadb:10.6 | なし | always |
+| wp-mariadb-prod | mariadb:11.4.14 | なし | always |
 
-WordPress のイメージはバージョンを固定している（→ [99 決定ログ](99_decision-log.md)）。
+WordPress と MariaDB のイメージはバージョンを固定している（→ [99 決定ログ](99_decision-log.md)）。
 
 ## ファイル構成
 
@@ -75,6 +75,55 @@ docker exec wp-app-prod php -v
 - `/var/www/html` の直下に手でファイルを置くと、次のデプロイで消える
 - 自動更新を止めているので、WordPress のセキュリティリリースは自分でタグを上げない限り適用されない
 - プラグインとテーマは `wp-content` にあるため、これまでどおり管理画面から更新する
+
+## MariaDB の更新
+
+MariaDB のバージョンも、`docker-compose.yml` のイメージのタグで決める。`MARIADB_AUTO_UPGRADE: "1"` を設定しているため、データが古いバージョンのものなら、起動時に公式イメージが `mariadb-upgrade` を実行してシステムテーブルを新しい版に合わせる。
+
+- 自動で取られるバックアップはシステムテーブル（`mysql` データベース）だけ。記事などのデータは含まれないので、更新前に必ず自分でバックアップを取る
+- MariaDB はデータを古い版に戻せない。戻すときは、停止した状態で取ったデータディレクトリのコピーを使う
+- deploy.sh は `--no-deps` で WordPress しか作り直さないため、DB は手動で更新する
+- `docker-compose.yml` はローカルと共通なので、先にローカルで同じ更新を試す
+
+```bash
+cd /var/www/my-wp-blog
+mkdir -p backup
+
+# 1. ダンプ（サイトは動いたまま）
+docker exec wp-mariadb-prod sh -c 'exec mariadb-dump --all-databases -uroot -p"$MYSQL_ROOT_PASSWORD"' \
+  > backup/before-<新バージョン>-$(date +%Y%m%d).sql
+chmod 600 backup/before-*.sql
+tail -1 backup/before-*.sql                # -- Dump completed on ... で終わっているか
+
+# 2. 停止して、データディレクトリをコピー（ここからサイトが止まる）
+docker compose -f docker-compose.prod.yml stop -t 60 wp-db
+docker logs wp-mariadb-prod --tail 3       # 「Shutdown complete」を必ず確認してから次へ
+sudo cp -a wp-db-data wp-db-data.bak-<旧バージョン>
+
+# 3. 反映（手元でタグを上げて push 済み）
+git pull --ff-only origin main
+docker compose -f docker-compose.prod.yml config | grep 'image: mariadb'
+docker compose -f docker-compose.prod.yml pull wp-db
+docker compose -f docker-compose.prod.yml up -d wp-db
+
+# 4. 確認（mariadb-upgrade が終わるまで20秒ほど待つ）
+docker logs wp-mariadb-prod 2>&1 | tail -5                  # ready for connections / 新バージョン
+docker exec wp-mariadb-prod cat /var/lib/mysql/mariadb_upgrade_info
+curl -sI https://yu-syumilog.com/ | head -1
+```
+
+- `mariadb-upgrade` が終わるまでは、`mysql.column_stats` の定義が違うというエラーが出る。システムテーブルが古いためで、アップグレードが終われば出なくなる
+- 旧バージョンが正常に停止していないと、新バージョンは「Upgrade after a crash is not supported」で起動しない。その場合は旧バージョンのタグで一度起動・正常停止してから上げ直す（→ [99 決定ログ](99_decision-log.md)）
+- 数日問題なく動いたら、`sudo rm -rf wp-db-data.bak-<旧バージョン>` で削除する。`wp-db-data*/` は `.gitignore` で除外している
+
+### うまく動かないとき
+
+```bash
+docker compose -f docker-compose.prod.yml stop wp-db
+sudo rm -rf wp-db-data && sudo mv wp-db-data.bak-<旧バージョン> wp-db-data
+# docker-compose.yml のタグを旧バージョンに戻す（revert を push して pull）
+docker compose -f docker-compose.prod.yml up -d wp-db
+```
 
 ## Git管理
 

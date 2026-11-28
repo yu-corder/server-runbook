@@ -86,3 +86,21 @@
 - **復旧**: ローカル用のコンテナを停止・削除し、`docker compose -f docker-compose.prod.yml up -d` で本番用を起動した。データ（`wp-content`、`wp-db-data`）はバインドマウントのため影響なし
 - **再発防止**: 本番では必ず `-f docker-compose.prod.yml` を付ける（→ [07](07_deploy.md#compose-ファイルを必ず指定する)）
 - **わかったこと**: deploy.sh は `--no-deps` で WordPress だけを作り直すため、DB コンテナが消えている状態からは復旧できない
+
+## MariaDB を 10.6 から 11.4.14 に上げる（2026-11-28）
+
+- **決定**: `mariadb:10.6` から `mariadb:11.4.14` に上げる。タグはパッチバージョンまで固定し、`MARIADB_AUTO_UPGRADE: "1"` を設定する
+- **理由**: MariaDB 10.6 は 2026-07-06 にサポートが終了し、セキュリティ修正が出なくなったため。WordPress も推奨する最低バージョンを 10.11 に上げている
+- **移行先に 11.4 を選んだ理由**: LTS で、サポートが 2029 年 5 月まであり、10.11 より長く使える。10.6 から直接上げても問題ないことが確認されている
+- **タグを固定した理由**: WordPress のイメージと同じく、いつ何に上げたかを Git の履歴で追えるようにするため（→「WordPress の Docker イメージのバージョンを固定する」）
+- **方法**: 公式イメージの `MARIADB_AUTO_UPGRADE` で、起動時に `mariadb-upgrade` を自動で実行する。事前にダンプと、停止した状態でのデータディレクトリのコピーを取った（手順は [05](05_wordpress.md#mariadb-の更新)）
+- **影響**: 本番では数分サイトが止まった。データの欠落や表示の不具合はなし
+
+## ローカルで MariaDB が起動しなくなった件（2026-11-28）
+
+- **何が起きたか**: ローカルで 11.4 に上げたところ、「Upgrade after a crash is not supported. The redo log was created with MariaDB 10.6.25」で起動せず、WordPress が「Error establishing a database connection」になった
+- **原因**: 以前の 10.6 が正常に停止しておらず、redo log が処理されないまま残っていた。新しいバージョンは、この状態からのアップグレードに対応していない
+- **復旧**: タグを 10.6 に戻して起動し（クラッシュリカバリが走る）、`stop -t 60` で正常に停止させてから 11.4 で起動し直した。11.4 は InnoDB の初期化の段階で中止していたため、データファイルは書き換わっていなかった
+- **再発防止**: 本番では、停止後に `docker logs` で「Shutdown complete」を確認してから、データディレクトリのコピーとタグの変更を行う（→ [05](05_wordpress.md#mariadb-の更新)）
+- **わかったこと**: タグを変えたつもりでも、ファイルが保存されていないと古いイメージのまま起動する。変更後は `docker compose config | grep image` で compose が認識している値を確認する
+

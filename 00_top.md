@@ -24,7 +24,7 @@ flowchart LR
         end
         subgraph WP[my-wp-blog_default]
             WPAPP[wp-app-prod<br>WordPress<br>:8080]
-            WPDB[(wp-mariadb-prod<br>MariaDB 10.6)]
+            WPDB[(wp-mariadb-prod<br>MariaDB 11.4)]
         end
         NGINX -->|yu-syumilog.com| WPAPP
         WPAPP --> WPDB
